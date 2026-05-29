@@ -4,110 +4,105 @@
  * app/estado/page.tsx
  *
  * Pantalla "Estado" — resumen visual rápido del proceso de fermentación.
- *
- * ─── MIGRACIÓN A DATOS REALES ───────────────────────────────────────────────
- * Esta pantalla usa datos mockeados. Para conectar a Supabase en tiempo real:
- *
- * 1. Reemplazar las constantes MOCK_* por el hook useReadings:
- *
- *      const { readings, loading, error } = useReadings({
- *        deviceIds: DEVICE_IDS,
- *        since: new Date(Date.now() - 10 * 60 * 1000), // últimos 10 min
- *        limit: 10,
- *        realtime: true,
- *      });
- *      const envLatest = readings.find(r => r.device_id === "esp32_nivel_2_001") ?? null;
- *      const mpuLatest = readings.find(r => r.device_id === "esp32_nivel_2_mpu_001") ?? null;
- *
- * 2. Eliminar las constantes MOCK_ENV_READING y MOCK_MPU_READING.
- * 3. Descomentar el bloque de loading/error en el JSX.
- *
- * Todo lo demás (evaluateFermentationStatus, componentes, layout) permanece igual.
- * ────────────────────────────────────────────────────────────────────────────
+ * Datos en tiempo real desde Supabase vía useReadings().
  */
 
 import { useMemo } from "react";
-import { METRICS, DEVICES } from "@/lib/devices";
+import { DEVICE_IDS, METRICS, DEVICES } from "@/lib/devices";
 import { toNumber, toBool, formatNumber } from "@/lib/format";
 import { evaluateFermentationStatus } from "@/lib/status";
+import { useReadings } from "@/lib/useReadings";
+import { useNow } from "@/lib/useNow";
 import type { Reading } from "@/lib/types";
 
-import { PageShell, Panel, EmptyState } from "@/app/components/page-shell";
+import { PageShell, Panel, EmptyState, ErrorState } from "@/app/components/page-shell";
 import {
   StatusBanner,
   SensorRow,
   AlertItem,
   DeviceChip,
+  WineTempGauge,
 } from "@/app/components/status-cards";
 
-// ─── Datos mockeados ─────────────────────────────────────────────────────────
-// Simulan la estructura exacta que llega desde Supabase vía useReadings().
-// Ajusta los valores para probar distintos estados del sistema.
-
-const NOW_ISO = new Date().toISOString();
-
-const MOCK_ENV_READING: Reading = {
-  device_id: "esp32_nivel_2_001",
-  level: "nivel_2",
-  created_at: NOW_ISO,
-  ambient_temperature: 24.6,   // cambiar a >30 para probar estado "crítico"
-  ambient_humidity: 72.3,
-  wine_temperature: 23.4,      // cambiar a >28 para probar alerta de vino
-  light: 620,                  // <1500 = oscuro (warn) | >4000 = saturado (warn)
-  accel_x: null,
-  accel_y: null,
-  accel_z: null,
-  gyro_x: null,
-  gyro_y: null,
-  gyro_z: null,
-  movement: null,
-};
-
-const MOCK_MPU_READING: Reading = {
-  device_id: "esp32_nivel_2_mpu_001",
-  level: "nivel_2",
-  created_at: NOW_ISO,
-  ambient_temperature: null,
-  ambient_humidity: null,
-  wine_temperature: null,
-  light: null,
-  accel_x: 0.02,
-  accel_y: -0.01,
-  accel_z: 0.98,
-  gyro_x: 0.12,
-  gyro_y: -0.08,
-  gyro_z: 0.03,
-  movement: false,             // cambiar a true para probar alerta de movimiento
-};
-
-// ─── Página ──────────────────────────────────────────────────────────────────
+// Ventana de fetch — 30 min para que el sparkline del vino tenga puntos suficientes.
+// La detección online sigue usando ONLINE_WINDOW_MS (10 min) sobre el last_seen.
+const FETCH_WINDOW_MS = 30 * 60 * 1000;
 
 export default function EstadoPage() {
-  // ── Con datos reales, reemplazar estas dos líneas por useReadings() ───────
-  const envLatest: Reading | null = MOCK_ENV_READING;
-  const mpuLatest: Reading | null = MOCK_MPU_READING;
-  // ─────────────────────────────────────────────────────────────────────────
+  const now = useNow(30_000);
+  const since = useMemo(
+    () => (now ? new Date(now - FETCH_WINDOW_MS) : undefined),
+    [now],
+  );
+
+  const { readings, loading, error, lastUpdate } = useReadings({
+    deviceIds: DEVICE_IDS,
+    since,
+    limit: 500,
+    realtime: true,
+  });
+
+  const envReadings = useMemo(
+    () => readings.filter((r) => r.device_id === "esp32_nivel_2_001"),
+    [readings],
+  );
+  const envLatest: Reading | null = envReadings[0] ?? null;
+  const mpuLatest: Reading | null =
+    readings.find((r) => r.device_id === "esp32_nivel_2_mpu_001") ?? null;
+
+  // Historial de temp. del vino (orden cronológico: viejo → nuevo)
+  const wineHistory = useMemo(() => {
+    return envReadings
+      .slice()
+      .reverse()
+      .map((r) => toNumber(r.wine_temperature))
+      .filter((v): v is number => v !== null);
+  }, [envReadings]);
+
+  const ambientTemperature = envLatest
+    ? toNumber(envLatest.ambient_temperature)
+    : null;
 
   const status = useMemo(
     () => evaluateFermentationStatus(envLatest, mpuLatest),
     [envLatest, mpuLatest],
   );
 
-  const envDevice  = DEVICES.find((d) => d.id === "esp32_nivel_2_001")!;
-  const mpuDevice  = DEVICES.find((d) => d.id === "esp32_nivel_2_mpu_001")!;
+  const envDevice = DEVICES.find((d) => d.id === "esp32_nivel_2_001")!;
+  const mpuDevice = DEVICES.find((d) => d.id === "esp32_nivel_2_mpu_001")!;
+
+  const isLive = !error && readings.length > 0;
 
   return (
     <PageShell
       title="Estado"
       subtitle="Resumen del estado actual del proceso de fermentación"
     >
+      {error && <ErrorState message={error} />}
+
+      {loading && readings.length === 0 && !error && (
+        <div className="mb-6">
+          <EmptyState title="Cargando datos…" hint="Conectando con Supabase" />
+        </div>
+      )}
+
       {/* ── Banner principal de estado ─────────────────────────────────── */}
-      <div className="mb-6">
+      <div className="mb-5">
         <StatusBanner
           overall={status.overall}
           summary={status.summary}
           detail={status.detail}
           alertCount={status.alerts.length}
+        />
+      </div>
+
+      {/* ── Marca destacada de la temperatura del vino ─────────────────── */}
+      <div className="mb-6">
+        <WineTempGauge
+          wine={status.wine}
+          lastSeenIso={envLatest?.created_at ?? null}
+          history={wineHistory}
+          ambientTemperature={ambientTemperature}
         />
       </div>
 
@@ -262,12 +257,41 @@ export default function EstadoPage() {
               Fuente de datos
             </p>
             <p className="mt-1 text-xs text-white/45">
-              {/* Cambiar este mensaje al migrar a datos reales */}
-              Datos simulados · Listo para conectar con Supabase en tiempo real
+              {isLive
+                ? "Supabase · suscripción en tiempo real"
+                : loading
+                  ? "Conectando con Supabase…"
+                  : error
+                    ? "Error de conexión — revisa la consola"
+                    : "Sin lecturas en los últimos 10 min"}
             </p>
             <div className="mt-2 flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
-              <span className="text-[11px] text-amber-300/70">Modo demo</span>
+              <span
+                className={`h-1.5 w-1.5 rounded-full ${
+                  isLive
+                    ? "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]"
+                    : error
+                      ? "bg-red-500"
+                      : "bg-amber-400"
+                }`}
+              />
+              <span
+                className={`text-[11px] ${
+                  isLive
+                    ? "text-emerald-300/80"
+                    : error
+                      ? "text-red-300/80"
+                      : "text-amber-300/70"
+                }`}
+              >
+                {isLive
+                  ? lastUpdate
+                    ? `actualizado ${lastUpdate.toLocaleTimeString("es-BO", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`
+                    : "en vivo"
+                  : error
+                    ? "desconectado"
+                    : "esperando datos"}
+              </span>
             </div>
           </div>
         </div>

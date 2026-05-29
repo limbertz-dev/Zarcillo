@@ -22,6 +22,107 @@ import type { Reading, SystemStatus, AlertEvent, ReadingMetric } from "./types";
 // ─── Re-exportar SystemStatus para que status-cards.tsx pueda importarlo ─────
 export type { SystemStatus, AlertEvent };
 
+// ─── Evaluación de la temperatura del vino (etapa de fermentación) ───────────
+// Umbrales orientados a tinto joven. Bilateral: detecta frío y calor.
+
+export type WineTempStage =
+  | "cold-critical"
+  | "cold"
+  | "optimal"
+  | "warm"
+  | "hot";
+
+export type WineTempAssessment = {
+  stage: WineTempStage;
+  label: string;
+  description: string;
+  status: "normal" | "warning" | "alert";
+  color: string;
+  temperature: number | null;
+  optimalMin: number;
+  optimalMax: number;
+  scaleMin: number;
+  scaleMax: number;
+};
+
+const WINE_SCALE = { min: 10, max: 32, optMin: 18, optMax: 25 };
+
+export function evaluateWineStage(
+  temperature: number | null,
+): WineTempAssessment {
+  const base = {
+    optimalMin: WINE_SCALE.optMin,
+    optimalMax: WINE_SCALE.optMax,
+    scaleMin: WINE_SCALE.min,
+    scaleMax: WINE_SCALE.max,
+  };
+
+  if (temperature === null || Number.isNaN(temperature)) {
+    return {
+      ...base,
+      stage: "optimal",
+      label: "Sin datos",
+      description: "No hay lectura reciente de la sonda DS18B20.",
+      status: "normal",
+      color: "#64748b",
+      temperature: null,
+    };
+  }
+  if (temperature < 12) {
+    return {
+      ...base,
+      stage: "cold-critical",
+      label: "Frío crítico",
+      description: "Fermentación prácticamente detenida. Elevar la temperatura del recinto.",
+      status: "alert",
+      color: "#3b82f6",
+      temperature,
+    };
+  }
+  if (temperature < WINE_SCALE.optMin) {
+    return {
+      ...base,
+      stage: "cold",
+      label: "Frío",
+      description: "Fermentación lenta. Conviene acercarse al rango óptimo (18–25 °C).",
+      status: "warning",
+      color: "#06b6d4",
+      temperature,
+    };
+  }
+  if (temperature <= WINE_SCALE.optMax) {
+    return {
+      ...base,
+      stage: "optimal",
+      label: "Óptimo",
+      description: "Rango ideal de fermentación. Mantener las condiciones actuales.",
+      status: "normal",
+      color: "#10b981",
+      temperature,
+    };
+  }
+  if (temperature <= 28) {
+    return {
+      ...base,
+      stage: "warm",
+      label: "Tibio",
+      description: "Fermentación acelerada. Vigilar aromas volátiles y posible parada.",
+      status: "warning",
+      color: "#f59e0b",
+      temperature,
+    };
+  }
+  return {
+    ...base,
+    stage: "hot",
+    label: "Caliente",
+    description: "Riesgo crítico para la fermentación. Enfriar el mosto inmediatamente.",
+    status: "alert",
+    color: "#ef4444",
+    temperature,
+  };
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // SECCIÓN ORIGINAL — no modificada
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -85,6 +186,7 @@ export type FermentationStatus = {
   alerts: AlertEvent[];
   sensorStatuses: Record<string, import("./devices").MetricStatus>;
   devices: DeviceOnlineStatus[];
+  wine: WineTempAssessment;
 };
 
 // ── Helpers internos ──────────────────────────────────────────────────────────
@@ -221,6 +323,32 @@ export function evaluateFermentationStatus(
       if (a) alerts.push(a);
     }
 
+    // Vino: comprobación bilateral (frío + caliente) basada en etapas
+    const wineVal = toNumber(envLatest.wine_temperature);
+    const wineAssess = evaluateWineStage(wineVal);
+    if (wineVal !== null && wineAssess.status !== "normal") {
+      const isLow = wineVal < WINE_SCALE.optMin;
+      const level: AlertEvent["level"] =
+        wineAssess.status === "alert" ? "danger" : "warning";
+      alerts.push({
+        id: `wine-stage-${wineAssess.stage}`,
+        device_id: envLatest.device_id,
+        metric: "wine_temperature",
+        level,
+        message: isLow
+          ? `Temp. del vino ${wineVal.toFixed(1)} °C — ${wineAssess.label.toLowerCase()}: ${wineAssess.description}`
+          : `Temp. del vino ${wineVal.toFixed(1)} °C — ${wineAssess.label.toLowerCase()}: ${wineAssess.description}`,
+        value: wineVal,
+        created_at: envLastSeen,
+      });
+      // Si la etapa empeora el status, lo elevamos
+      const current = sensorStatuses["wine_temperature"] ?? "normal";
+      const order = { normal: 0, warning: 1, alert: 2 } as const;
+      if (order[wineAssess.status] > order[current]) {
+        sensorStatuses["wine_temperature"] = wineAssess.status;
+      }
+    }
+
     // Luz: lógica especial (oscuro / saturado)
     const ldrVal = toNumber(envLatest.light);
     if (ldrVal !== null) {
@@ -317,5 +445,17 @@ export function evaluateFermentationStatus(
     detail  = "Todos los parámetros dentro de los rangos normales de operación.";
   }
 
-  return { overall, summary, detail, alerts: uniqueAlerts, sensorStatuses, devices };
+  const wine = evaluateWineStage(
+    envLatest ? toNumber(envLatest.wine_temperature) : null,
+  );
+
+  return {
+    overall,
+    summary,
+    detail,
+    alerts: uniqueAlerts,
+    sensorStatuses,
+    devices,
+    wine,
+  };
 }
