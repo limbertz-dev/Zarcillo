@@ -34,9 +34,9 @@ jobs:
           app_build_command: "npm run build"
         env:
           IS_STATIC_EXPORT: true
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          NEXT_PUBLIC_LAMP_COMMAND_ENDPOINT: ${{ secrets.NEXT_PUBLIC_LAMP_COMMAND_ENDPOINT }}
+          NEXT_PUBLIC_SUPABASE_URL: https://vndxwvmrsymxprgwhsup.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZuZHh3dm1yc3lteHByZ3doc3VwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1NzkyMjEsImV4cCI6MjA5NTE1NTIyMX0.KW2Epmh055-ILFBWUB7lT6x4sIZSIjtY63yelIsSZfE
+          NEXT_PUBLIC_LAMP_COMMAND_ENDPOINT: https://team-limbert-gabriel-limberttt-975f8e81.flowfuse.cloud/lamp
 
   close_pull_request_job:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'
