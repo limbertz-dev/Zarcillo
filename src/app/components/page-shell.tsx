@@ -82,11 +82,23 @@ export function EmptyState({
   );
 }
 
-export function ErrorState({ message }: { message: string }) {
+export function ErrorState({
+  message,
+  title = "Error al consultar Supabase",
+}: {
+  message: string;
+  title?: string;
+}) {
+  const safeMessage =
+    !message || message === "[object Object]"
+      ? "No se pudo obtener una descripción del error. Revisa la consola del navegador."
+      : message;
   return (
-    <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-5 text-red-200">
-      <p className="text-sm font-medium">Error al consultar Supabase</p>
-      <p className="mt-1 text-xs text-red-200/80">{message}</p>
+    <div className="mb-5 rounded-xl border border-red-500/30 bg-red-500/10 p-5 text-red-200">
+      <p className="text-sm font-medium">{title}</p>
+      <p className="mt-1 whitespace-pre-wrap break-words text-xs text-red-200/80">
+        {safeMessage}
+      </p>
     </div>
   );
 }

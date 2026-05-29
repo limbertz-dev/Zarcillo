@@ -46,13 +46,21 @@ export function LineChart({
     getServerMountedSnapshot,
   );
 
-  if (!mounted) {
-    return <div style={{ width: "100%", height }} aria-hidden />;
+  if (!mounted || data.length === 0) {
+    return (
+      <div
+        style={{ width: "100%", height, minHeight: 260 }}
+        aria-hidden
+      />
+    );
   }
 
   return (
-    <div style={{ width: "100%", height }}>
-      <ResponsiveContainer width="100%" height="100%">
+    <div
+      style={{ width: "100%", height, minHeight: 260 }}
+      className="min-w-0"
+    >
+      <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
         <RLineChart
           data={data}
           margin={{ top: 8, right: 12, left: -10, bottom: 0 }}

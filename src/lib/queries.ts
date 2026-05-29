@@ -9,6 +9,20 @@ export type FetchReadingsOptions = {
   ascending?: boolean;
 };
 
+export function formatSupabaseError(error: unknown): string {
+  console.error("Supabase error:", error);
+  if (error && typeof error === "object") {
+    const e = error as { message?: string; details?: string; hint?: string };
+    const parts: string[] = [];
+    if (e.message) parts.push(e.message);
+    if (e.details) parts.push(e.details);
+    if (e.hint) parts.push(`Pista: ${e.hint}`);
+    if (parts.length > 0) return parts.join(" — ");
+  }
+  if (error instanceof Error) return error.message;
+  return "Error desconocido al consultar Supabase";
+}
+
 export async function fetchReadings(
   opts: FetchReadingsOptions = {},
 ): Promise<Reading[]> {
@@ -34,7 +48,7 @@ export async function fetchReadings(
   if (opts.limit) q = q.limit(opts.limit);
 
   const { data, error } = await q;
-  if (error) throw error;
+  if (error) throw new Error(formatSupabaseError(error));
   return (data ?? []) as Reading[];
 }
 

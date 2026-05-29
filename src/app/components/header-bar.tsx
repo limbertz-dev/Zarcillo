@@ -1,10 +1,17 @@
 "use client";
+import { useState } from "react";
 import { DEVICES } from "@/lib/devices";
 import { useReadings } from "@/lib/useReadings";
 import { computeDeviceStatus, computeSystemStatus } from "@/lib/status";
 import type { SystemStatus } from "@/lib/types";
-import { formatRelative, toBool } from "@/lib/format";
+import { formatRelative } from "@/lib/format";
 import { useNow } from "@/lib/useNow";
+import {
+  isLampEndpointConfigured,
+  setLampState,
+} from "@/lib/lamp-control";
+
+const LAMP_DEVICE_ID = "esp32_nivel_2_001";
 
 const STATUS_META: Record<
   SystemStatus,
@@ -43,10 +50,36 @@ export function HeaderBar() {
   const deviceStatuses = computeDeviceStatus(readings, tickNow || 0);
   const status = computeSystemStatus(deviceStatuses, !!error);
   const meta = STATUS_META[status];
-  const telemetryLampOn = readings.some((reading) =>
-    toBool(reading.dashboard_lamp),
-  );
-  const ledOn = telemetryLampOn;
+
+  const endpointReady = isLampEndpointConfigured();
+  const [lampOn, setLampOn] = useState(false);
+  const [lampLoading, setLampLoading] = useState(false);
+  const [lampError, setLampError] = useState<string | null>(null);
+
+  async function toggleLamp() {
+    if (!endpointReady || lampLoading) return;
+    const next = !lampOn;
+    setLampLoading(true);
+    setLampError(null);
+    try {
+      await setLampState(LAMP_DEVICE_ID, next);
+      setLampOn(next);
+    } catch (err) {
+      setLampError(err instanceof Error ? err.message : "Error desconocido");
+    } finally {
+      setLampLoading(false);
+    }
+  }
+
+  const lampTitle = !endpointReady
+    ? "Endpoint de lámpara no configurado (NEXT_PUBLIC_LAMP_COMMAND_ENDPOINT)"
+    : lampError
+      ? lampError
+      : lampLoading
+        ? "Enviando comando…"
+        : lampOn
+          ? "Lámpara encendida — click para apagar"
+          : "Lámpara apagada — click para encender";
 
   const dateStr = now
     ? now.toLocaleDateString("es-BO", {
@@ -102,21 +135,20 @@ export function HeaderBar() {
         </div>
         <button
           type="button"
-          aria-label={ledOn ? "Lamparas encendidas" : "Lamparas apagadas"}
-          aria-pressed={ledOn}
-          disabled
-          title={
-            ledOn
-              ? "Lamparas encendidas segun telemetria"
-              : "Lamparas apagadas segun telemetria"
-          }
-          className={`flex h-9 w-9 items-center justify-center rounded-full transition ${
-            ledOn
+          onClick={toggleLamp}
+          disabled={!endpointReady || lampLoading}
+          aria-label={lampOn ? "Apagar lámpara" : "Encender lámpara"}
+          aria-pressed={lampOn}
+          title={lampTitle}
+          className={`flex h-9 w-9 items-center justify-center rounded-full transition disabled:cursor-not-allowed ${
+            lampOn
               ? "bg-amber-400/15 text-amber-300 ring-1 ring-amber-400/40 shadow-[0_0_12px_rgba(251,191,36,0.55)]"
-              : "text-white/40 ring-1 ring-white/10"
-          }`}
+              : lampError
+                ? "text-red-300 ring-1 ring-red-400/40"
+                : "text-white/40 ring-1 ring-white/10 hover:bg-white/10 hover:text-white disabled:opacity-50"
+          } ${lampLoading ? "animate-pulse" : ""}`}
         >
-          <LedBulb on={ledOn} />
+          <LedBulb on={lampOn} />
         </button>
         <button
           type="button"

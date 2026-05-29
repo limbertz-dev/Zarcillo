@@ -15,7 +15,6 @@ export type Reading = {
   gyro_y: number | string | null;
   gyro_z: number | string | null;
   movement: boolean | string | null;
-  dashboard_lamp: boolean | string | number | null;
 };
 
 export type ReadingMetric =

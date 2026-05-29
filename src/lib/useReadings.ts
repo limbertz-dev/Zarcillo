@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useReducer, useRef, useState } from "react";
-import { fetchReadings, type FetchReadingsOptions } from "./queries";
+import {
+  fetchReadings,
+  formatSupabaseError,
+  type FetchReadingsOptions,
+} from "./queries";
 import { supabase } from "./supabase";
 import type { Reading } from "./types";
 
@@ -100,7 +104,7 @@ export function useReadings(
         if (cancelled) return;
         dispatch({
           type: "error",
-          message: err instanceof Error ? err.message : String(err),
+          message: formatSupabaseError(err),
         });
       });
     return () => {

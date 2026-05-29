@@ -75,7 +75,6 @@ export default function SensoresPage() {
       { key: "gyro_y", label: "gyro_y" },
       { key: "gyro_z", label: "gyro_z" },
       { key: "movement", label: "movement" },
-      { key: "dashboard_lamp", label: "dashboard_lamp" },
     ]);
     downloadCSV(`zarcillo-readings-${from}_${to}.csv`, csv);
   }
@@ -188,7 +187,7 @@ export default function SensoresPage() {
           }
         >
           <div className="-mx-5 overflow-x-auto">
-            <table className="w-full min-w-[920px] text-left text-sm">
+            <table className="w-full min-w-[820px] text-left text-sm">
               <thead className="text-[11px] uppercase tracking-wider text-white/45">
                 <tr>
                   <th className="px-5 py-2 font-medium">Timestamp</th>
@@ -198,7 +197,6 @@ export default function SensoresPage() {
                   <th className="px-3 py-2 font-medium text-right">Temp Vino</th>
                   <th className="px-3 py-2 font-medium text-right">Luz</th>
                   <th className="px-3 py-2 font-medium text-center">Mov.</th>
-                  <th className="px-3 py-2 font-medium text-center">Lampara</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/[0.05] text-white/85">
@@ -249,17 +247,6 @@ function Row({ r }: { r: Reading }) {
           </span>
         ) : (
           <span className="text-[10px] text-white/40">no</span>
-        )}
-      </td>
-      <td className="px-3 py-2 text-center">
-        {r.dashboard_lamp === null || r.dashboard_lamp === undefined ? (
-          <span className="text-white/30">—</span>
-        ) : toBool(r.dashboard_lamp) ? (
-          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-medium text-emerald-300">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> ON
-          </span>
-        ) : (
-          <span className="text-[10px] text-white/40">off</span>
         )}
       </td>
     </tr>

@@ -61,7 +61,6 @@ const MOCK_ENV_READING: Reading = {
   gyro_y: null,
   gyro_z: null,
   movement: null,
-  dashboard_lamp: false,
 };
 
 const MOCK_MPU_READING: Reading = {
@@ -79,7 +78,6 @@ const MOCK_MPU_READING: Reading = {
   gyro_y: -0.08,
   gyro_z: 0.03,
   movement: false,             // cambiar a true para probar alerta de movimiento
-  dashboard_lamp: false,
 };
 
 // ─── Página ──────────────────────────────────────────────────────────────────

@@ -13,7 +13,6 @@ import {
   PageShell,
 } from "../components/page-shell";
 import { MetricCard } from "../components/metric-card";
-import { LampControls } from "../components/lamp-controls";
 import { LineChart, type SeriesDef } from "../components/line-chart";
 import { RangeSelector, RANGE_MS, type RangeKey } from "../components/range-selector";
 
@@ -87,10 +86,6 @@ export default function DashboardPage() {
         <DashboardMetric metric="gyro_x" latest={mpuLatest} history={mpu} />
         <MovementCard latest={mpuLatest} />
       </div>
-
-      <Panel className="mb-6">
-        <LampControls readings={readings} />
-      </Panel>
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
         <Panel
