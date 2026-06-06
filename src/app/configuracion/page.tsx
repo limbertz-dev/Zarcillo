@@ -45,10 +45,10 @@ export default function ConfiguracionPage() {
                     {m.label}
                   </td>
                   <td className="py-2 text-right tabular-nums text-white/70">
-                    {m.warnAbove !== undefined ? `> ${m.warnAbove} ${m.unit}` : "—"}
+                    {formatThreshold(m.warnBelow, m.warnAbove, m.unit)}
                   </td>
                   <td className="py-2 text-right tabular-nums text-white/70">
-                    {m.alertAbove !== undefined ? `> ${m.alertAbove} ${m.unit}` : "—"}
+                    {formatThreshold(m.alertBelow, m.alertAbove, m.unit)}
                   </td>
                 </tr>
               ))}
@@ -58,4 +58,15 @@ export default function ConfiguracionPage() {
       </div>
     </PageShell>
   );
+}
+
+function formatThreshold(
+  below: number | undefined,
+  above: number | undefined,
+  unit: string,
+): string {
+  const parts: string[] = [];
+  if (below !== undefined) parts.push(`< ${below} ${unit}`.trim());
+  if (above !== undefined) parts.push(`> ${above} ${unit}`.trim());
+  return parts.length > 0 ? parts.join(" o ") : "—";
 }

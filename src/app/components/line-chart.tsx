@@ -63,7 +63,7 @@ export function LineChart({
       <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
         <RLineChart
           data={data}
-          margin={{ top: 8, right: 12, left: -10, bottom: 0 }}
+          margin={{ top: 8, right: 12, left: 4, bottom: 0 }}
         >
           <CartesianGrid stroke="rgba(255,255,255,0.05)" vertical={false} />
           <XAxis
@@ -78,9 +78,11 @@ export function LineChart({
             stroke="rgba(255,255,255,0.25)"
             tickLine={false}
             axisLine={false}
-            width={42}
+            width={52}
             tickFormatter={(v) =>
-              typeof v === "number" ? formatNumber(v, 1) : String(v)
+              typeof v === "number"
+                ? v.toLocaleString("es-BO", { maximumFractionDigits: 1 })
+                : String(v)
             }
           />
           <Tooltip

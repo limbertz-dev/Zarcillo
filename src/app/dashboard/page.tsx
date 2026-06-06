@@ -59,13 +59,14 @@ export default function DashboardPage() {
       <h3 className="mb-3 mt-2 text-xs font-semibold uppercase tracking-widest text-white/45">
         ESP32 Principal · Ambiente
       </h3>
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
         {(
           [
             "ambient_temperature",
             "ambient_humidity",
             "wine_temperature",
             "light",
+            "ph",
           ] as ReadingMetric[]
         ).map((m) => (
           <DashboardMetric
@@ -122,9 +123,18 @@ export default function DashboardPage() {
           />
         </Panel>
 
+        <Panel title="pH del mosto" subtitle="ESP32 Principal">
+          <LineChart
+            data={toChartData(env, ["ph"])}
+            series={[metricSeries("ph")]}
+            rangeMs={RANGE_MS[range]}
+          />
+        </Panel>
+
         <Panel
           title="Aceleración y Giroscopio"
           subtitle="ESP32 MPU6050"
+          className="xl:col-span-2"
         >
           <LineChart
             data={toChartData(mpu, [

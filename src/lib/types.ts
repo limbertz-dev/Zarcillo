@@ -8,6 +8,8 @@ export type Reading = {
   ambient_humidity: number | string | null;
   wine_temperature: number | string | null;
   light: number | string | null;
+  ph: number | string | null;
+  ph_voltage: number | string | null;
   accel_x: number | string | null;
   accel_y: number | string | null;
   accel_z: number | string | null;
@@ -22,6 +24,7 @@ export type ReadingMetric =
   | "ambient_humidity"
   | "wine_temperature"
   | "light"
+  | "ph"
   | "accel_x"
   | "accel_y"
   | "accel_z"

@@ -14,7 +14,6 @@ const ITEMS: Item[] = [
   { href: "/dashboard", label: "Dashboard", icon: <DashboardIcon /> },
   { href: "/sensores", label: "Sensores", icon: <SensorsIcon /> },
   { href: "/historicos", label: "Históricos", icon: <HistoryIcon /> },
-  { href: "/alertas", label: "Alertas", icon: <AlertIcon /> },
   { href: "/reportes", label: "Reportes", icon: <ReportIcon /> },
   { href: "/configuracion", label: "Configuración", icon: <GearIcon /> },
 ];
@@ -183,25 +182,6 @@ function HistoryIcon() {
       <path d="M3 12a9 9 0 1 0 3-6.7" />
       <path d="M3 4v5h5" />
       <path d="M12 7v5l3 2" />
-    </svg>
-  );
-}
-
-function AlertIcon() {
-  return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M12 3 2 20h20L12 3Z" />
-      <path d="M12 10v4" />
-      <circle cx="12" cy="17" r="0.5" fill="currentColor" />
     </svg>
   );
 }

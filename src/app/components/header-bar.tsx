@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useState } from "react";
 import { DEVICES } from "@/lib/devices";
 import { useReadings } from "@/lib/useReadings";
@@ -150,13 +151,14 @@ export function HeaderBar() {
         >
           <LedBulb on={lampOn} />
         </button>
-        <button
-          type="button"
+        <Link
+          href="/configuracion"
           aria-label="Ajustes"
+          title="Ir a configuración"
           className="flex h-9 w-9 items-center justify-center rounded-full text-white/60 transition hover:bg-white/10 hover:text-white"
         >
           <GearSmall />
-        </button>
+        </Link>
         <button
           type="button"
           aria-label="Usuario"

@@ -10,6 +10,7 @@ export const DEVICES: Device[] = [
       "ambient_humidity",
       "wine_temperature",
       "light",
+      "ph",
     ],
   },
   {
@@ -35,6 +36,8 @@ export type MetricMeta = {
   device: DeviceId;
   warnAbove?: number;
   alertAbove?: number;
+  warnBelow?: number;
+  alertBelow?: number;
 };
 
 export const METRICS: Record<ReadingMetric, MetricMeta> = {
@@ -45,7 +48,10 @@ export const METRICS: Record<ReadingMetric, MetricMeta> = {
     color: "#ef4444",
     digits: 1,
     device: "esp32_nivel_2_001",
-    alertAbove: 30,
+    warnBelow: 15,
+    alertBelow: 10,
+    warnAbove: 28,
+    alertAbove: 32,
   },
   ambient_humidity: {
     key: "ambient_humidity",
@@ -54,7 +60,10 @@ export const METRICS: Record<ReadingMetric, MetricMeta> = {
     color: "#3b82f6",
     digits: 1,
     device: "esp32_nivel_2_001",
-    alertAbove: 85,
+    warnBelow: 55,
+    alertBelow: 40,
+    warnAbove: 80,
+    alertAbove: 90,
   },
   wine_temperature: {
     key: "wine_temperature",
@@ -63,16 +72,32 @@ export const METRICS: Record<ReadingMetric, MetricMeta> = {
     color: "#f97316",
     digits: 1,
     device: "esp32_nivel_2_001",
-    alertAbove: 28,
+    warnBelow: 18,
+    alertBelow: 15,
+    warnAbove: 28,
+    alertAbove: 32,
   },
   light: {
     key: "light",
     label: "Luminosidad",
-    unit: "lux",
+    unit: "ADC",
     color: "#eab308",
     digits: 0,
     device: "esp32_nivel_2_001",
-    warnAbove: 800,
+    warnAbove: 1500,
+    alertAbove: 3000,
+  },
+  ph: {
+    key: "ph",
+    label: "pH",
+    unit: "",
+    color: "#14b8a6",
+    digits: 2,
+    device: "esp32_nivel_2_001",
+    warnBelow: 3.1,
+    alertBelow: 2.9,
+    warnAbove: 3.8,
+    alertAbove: 4.0,
   },
   accel_x: {
     key: "accel_x",
@@ -105,6 +130,8 @@ export const METRICS: Record<ReadingMetric, MetricMeta> = {
     color: "#a855f7",
     digits: 2,
     device: "esp32_nivel_2_mpu_001",
+    warnBelow: -35,
+    warnAbove: 35,
   },
   gyro_y: {
     key: "gyro_y",
@@ -113,6 +140,8 @@ export const METRICS: Record<ReadingMetric, MetricMeta> = {
     color: "#c084fc",
     digits: 2,
     device: "esp32_nivel_2_mpu_001",
+    warnBelow: -35,
+    warnAbove: 35,
   },
   gyro_z: {
     key: "gyro_z",
@@ -121,6 +150,8 @@ export const METRICS: Record<ReadingMetric, MetricMeta> = {
     color: "#e879f9",
     digits: 2,
     device: "esp32_nivel_2_mpu_001",
+    warnBelow: -35,
+    warnAbove: 35,
   },
 };
 
@@ -136,6 +167,8 @@ export function getMetricStatus(
     return "normal";
   }
   const meta = METRICS[metric];
+  if (meta.alertBelow !== undefined && value < meta.alertBelow) return "alert";
+  if (meta.warnBelow !== undefined && value < meta.warnBelow) return "warning";
   if (meta.alertAbove !== undefined && value > meta.alertAbove) return "alert";
   if (meta.warnAbove !== undefined && value > meta.warnAbove) return "warning";
   return "normal";

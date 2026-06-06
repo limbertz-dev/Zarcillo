@@ -68,6 +68,8 @@ export default function SensoresPage() {
       { key: "ambient_humidity", label: "ambient_humidity" },
       { key: "wine_temperature", label: "wine_temperature" },
       { key: "light", label: "light" },
+      { key: "ph", label: "ph" },
+      { key: "ph_voltage", label: "ph_voltage" },
       { key: "accel_x", label: "accel_x" },
       { key: "accel_y", label: "accel_y" },
       { key: "accel_z", label: "accel_z" },
@@ -187,7 +189,7 @@ export default function SensoresPage() {
           }
         >
           <div className="-mx-5 overflow-x-auto">
-            <table className="w-full min-w-[820px] text-left text-sm">
+            <table className="w-full min-w-[920px] text-left text-sm">
               <thead className="text-[11px] uppercase tracking-wider text-white/45">
                 <tr>
                   <th className="px-5 py-2 font-medium">Timestamp</th>
@@ -196,6 +198,7 @@ export default function SensoresPage() {
                   <th className="px-3 py-2 font-medium text-right">Humedad</th>
                   <th className="px-3 py-2 font-medium text-right">Temp Vino</th>
                   <th className="px-3 py-2 font-medium text-right">Luz</th>
+                  <th className="px-3 py-2 font-medium text-right">pH</th>
                   <th className="px-3 py-2 font-medium text-center">Mov.</th>
                 </tr>
               </thead>
@@ -217,6 +220,7 @@ function Row({ r }: { r: Reading }) {
   const hu = toNumber(r.ambient_humidity);
   const tv = toNumber(r.wine_temperature);
   const lu = toNumber(r.light);
+  const ph = toNumber(r.ph);
   const mov = toBool(r.movement);
   return (
     <tr className="hover:bg-white/[0.03]">
@@ -236,7 +240,10 @@ function Row({ r }: { r: Reading }) {
         <ValueBadge value={tv === null ? "—" : formatNumber(tv, 1)} status={getMetricStatus("wine_temperature", tv)} unit="°C" />
       </td>
       <td className="px-3 py-2 text-right">
-        <ValueBadge value={lu === null ? "—" : formatNumber(lu, 0)} status={getMetricStatus("light", lu)} unit="lux" />
+        <ValueBadge value={lu === null ? "—" : formatNumber(lu, 0)} status={getMetricStatus("light", lu)} unit="ADC" />
+      </td>
+      <td className="px-3 py-2 text-right">
+        <ValueBadge value={ph === null ? "—" : formatNumber(ph, 2)} status={getMetricStatus("ph", ph)} unit="" />
       </td>
       <td className="px-3 py-2 text-center">
         {r.movement === null || r.movement === undefined ? (
