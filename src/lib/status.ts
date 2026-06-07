@@ -123,15 +123,19 @@ export function evaluateWineStage(
   };
 }
 
-const REALISTIC_WINE_PH = { min: 2.5, max: 4.5 };
+// Rango oficial del proyecto: pH inválido sólo si está fuera de [2.9, 4.0].
+// (Antes era [2.5, 4.5], "realista para vino". Se unificó con la regla oficial
+//  para que dashboard, /estado y WhatsApp coincidan.)
+const OFFICIAL_WINE_PH = { min: 2.9, max: 4.0 };
 
 function isValidWinePh(value: number | null): boolean {
-  return (
-    value !== null &&
-    Number.isFinite(value) &&
-    value >= REALISTIC_WINE_PH.min &&
-    value <= REALISTIC_WINE_PH.max
-  );
+  // null y 0 cuentan como "sin lectura" → no son inválidos, sólo desconocidos.
+  if (value === null || !Number.isFinite(value) || value === 0) return false;
+  return value >= OFFICIAL_WINE_PH.min && value <= OFFICIAL_WINE_PH.max;
+}
+
+function phIsMissing(value: number | null): boolean {
+  return value === null || !Number.isFinite(value) || value === 0;
 }
 
 export function evaluateCurrentZoneStatus(
@@ -150,12 +154,14 @@ export function evaluateCurrentZoneStatus(
     nowMs - lastMs < ONLINE_WINDOW_MS;
 
   if (!online) {
+    // "Sin datos por más de 10 min" NO es una de las 5 alertas oficiales —
+    // queda como estado informativo (status normal, no dispara alerta principal).
     return {
       ...base,
       label: "Sin conexión",
       description:
         "No hay lectura reciente del ESP32 principal. Verificar conexión antes de evaluar la zona.",
-      status: "alert",
+      status: "normal",
       color: "#64748b",
     };
   }
@@ -170,6 +176,8 @@ export function evaluateCurrentZoneStatus(
   ].filter(Boolean);
   const contextText = context.length > 0 ? ` Contexto: ${context.join(", ")}.` : "";
 
+  // Etapas "cold-critical" (<15) y "hot" (>32) ya están en status="alert"
+  // por evaluateWineStage → coincide con alertas oficiales #1 y #2.
   if (base.status !== "normal") {
     return {
       ...base,
@@ -177,43 +185,28 @@ export function evaluateCurrentZoneStatus(
     };
   }
 
-  if (light !== null && light >= (METRICS.light.alertAbove ?? 3000)) {
+  // Alerta oficial #3 — Exceso de luz (light > 3000 ADC).
+  // El umbral intermedio "luz elevada" (>1500) ya no se reporta como alerta;
+  // queda sólo el valor amarillo en la tarjeta de luz del dashboard.
+  if (light !== null && light > 3000) {
     return {
       ...base,
       label: "Exceso de luz",
       description:
-        `La temperatura del vino está en rango, pero el LDR marca luz alta (${light.toFixed(0)} ADC). Proteger la cuba de luz directa.${contextText}`,
+        `La temperatura del vino está en rango, pero el LDR marca luz alta (${light.toFixed(0)} ADC > 3000). Proteger la cuba de luz directa.${contextText}`,
       status: "alert",
       color: "#f59e0b",
     };
   }
-  if (light !== null && light >= (METRICS.light.warnAbove ?? 1500)) {
-    return {
-      ...base,
-      label: "Luz elevada",
-      description:
-        `La temperatura del vino está en rango, pero hay exposición luminosa elevada (${light.toFixed(0)} ADC).${contextText}`,
-      status: "warning",
-      color: "#f59e0b",
-    };
-  }
 
-  if (ph === null) {
+  // Alerta oficial #4 — pH inválido (ph < 2.9 o ph > 4.0).
+  // null y 0 (sensor desconectado) NO disparan alerta.
+  if (!phIsMissing(ph) && !isValidWinePh(ph)) {
     return {
       ...base,
-      label: "Revisar sensor pH",
+      label: "pH inválido",
       description:
-        `La temperatura del vino está en rango, pero no hay lectura válida de pH. Revisar cableado o calibración.${contextText}`,
-      status: "warning",
-      color: "#14b8a6",
-    };
-  }
-  if (!isValidWinePh(ph)) {
-    return {
-      ...base,
-      label: "pH fuera de rango",
-      description:
-        `La temperatura del vino está en rango, pero el pH (${ph.toFixed(2)}) está fuera del rango realista para vino. Revisar sensor o calibración.${contextText}`,
+        `La temperatura del vino está en rango, pero el pH (${(ph as number).toFixed(2)}) está fuera del rango oficial ${OFFICIAL_WINE_PH.min}–${OFFICIAL_WINE_PH.max}. Revisar sensor o calibración.${contextText}`,
       status: "warning",
       color: "#14b8a6",
     };
@@ -694,12 +687,15 @@ export function evaluateFermentationStatus(
     },
   ];
 
+  // "Sin datos por más de 10 min" NO es una de las 5 alertas oficiales.
+  // Se mantiene como info (visible en la lista, pero NO escala el estado global
+  // a danger/warning y NO se manda por WhatsApp).
   if (!envOnline) {
     alerts.push({
       id: "offline-env",
       device_id: "esp32_nivel_2_001",
       metric: "offline",
-      level: "danger",
+      level: "info",
       message:
         "ESP32 Principal sin señal — no se reciben lecturas de temperatura ni humedad",
       value: null,
@@ -711,7 +707,7 @@ export function evaluateFermentationStatus(
       id: "offline-mpu",
       device_id: "esp32_nivel_2_mpu_001",
       metric: "offline",
-      level: "warning",
+      level: "info",
       message:
         "ESP32 MPU6050 sin señal — movimiento y vibración no disponibles",
       value: null,
@@ -720,34 +716,51 @@ export function evaluateFermentationStatus(
   }
 
   // ── Métricas de ambiente ────────────────────────────────────────────────
-  const envMetrics: ReadingMetric[] = [
+  // Sólo se generan alertas oficiales para wine_temperature, light y ph.
+  // ambient_temperature y ambient_humidity ya no son alertas oficiales; sólo se
+  // calcula sensorStatuses para mantener el coloreado de las tarjetas del
+  // dashboard tal como estaba (decisión del usuario para la demo).
+  const envSensorMetrics: ReadingMetric[] = [
     "ambient_temperature",
     "ambient_humidity",
     "wine_temperature",
     "light",
     "ph",
   ];
+  const envAlertMetrics: ReadingMetric[] = [
+    "wine_temperature",
+    "light",
+    "ph",
+  ];
 
   if (envLatest && envLastSeen) {
-    for (const m of envMetrics) {
+    for (const m of envSensorMetrics) {
       const val  = toNumber(envLatest[m]);
       const meta = METRICS[m];
 
       let status: import("./devices").MetricStatus = "normal";
       if (val !== null) {
-        if (
-          (meta.alertBelow !== undefined && val < meta.alertBelow) ||
-          (meta.alertAbove !== undefined && val > meta.alertAbove)
-        )
-          status = "alert";
-        else if (
-          (meta.warnBelow !== undefined && val < meta.warnBelow) ||
-          (meta.warnAbove !== undefined && val > meta.warnAbove)
-        )
-          status = "warning";
+        // pH=0 = sensor desconectado → no contamos como alerta (regla oficial).
+        const isPhMissing = m === "ph" && val === 0;
+        if (!isPhMissing) {
+          if (
+            (meta.alertBelow !== undefined && val < meta.alertBelow) ||
+            (meta.alertAbove !== undefined && val > meta.alertAbove)
+          )
+            status = "alert";
+          else if (
+            (meta.warnBelow !== undefined && val < meta.warnBelow) ||
+            (meta.warnAbove !== undefined && val > meta.warnAbove)
+          )
+            status = "warning";
+        }
       }
       sensorStatuses[m] = status;
 
+      // Sólo emitir alertas para las métricas oficiales (#1-#4).
+      if (!envAlertMetrics.includes(m)) continue;
+      // pH=0 = sensor desconectado, no es alerta oficial.
+      if (m === "ph" && val === 0) continue;
       const a = metricAlert(m, val, envLatest.device_id, envLastSeen);
       if (a) alerts.push(a);
     }
@@ -846,18 +859,8 @@ export function evaluateFermentationStatus(
       });
     }
 
-    const accelZ = toNumber(mpuLatest.accel_z);
-    if (accelZ !== null && Math.abs(accelZ - 1.0) > 0.3) {
-      alerts.push({
-        id: "accel-z-anomaly",
-        device_id: mpuLatest.device_id,
-        metric: "accel_z",
-        level: "info",
-        message: `Vibración inusual detectada (accel_z = ${accelZ.toFixed(3)} g)`,
-        value: accelZ,
-        created_at: mpuLastSeen,
-      });
-    }
+    // Anomalías de accel_z fueron retiradas: no son una de las 5 alertas oficiales.
+    // El valor sigue disponible en el dashboard como dato informativo.
   }
 
   // ── Deduplicar y ordenar alertas ────────────────────────────────────────
@@ -868,7 +871,7 @@ export function evaluateFermentationStatus(
     return true;
   });
   const levelOrder: Record<string, number> = { danger: 0, warning: 1, info: 2 };
-  uniqueAlerts.sort((a, b) => levelOrder[a.level] - levelOrder[b.level]);
+  uniqueAlerts.sort((a, b) => (levelOrder[a.level] ?? 9) - (levelOrder[b.level] ?? 9));
 
   // ── Estado general ───────────────────────────────────────────────────────
   const hasDanger  = uniqueAlerts.some((a) => a.level === "danger");
@@ -878,11 +881,10 @@ export function evaluateFermentationStatus(
   let summary: string;
   let detail: string;
 
-  if (!envOnline && !mpuOnline) {
-    overall = "error";
-    summary = "Sin conexión con los sensores";
-    detail  = "Ningún dispositivo está enviando datos. Verificar conectividad.";
-  } else if (hasDanger) {
+  // Las 5 alertas oficiales son las únicas que escalan el estado global.
+  // Offline ya no es alerta principal; sólo se refleja como warn si encima
+  // no hay ningún dato de las alertas oficiales.
+  if (hasDanger) {
     overall = "error";
     summary = "Condición crítica activa";
     detail  = "Hay una o más alertas críticas que requieren atención inmediata.";
@@ -890,6 +892,10 @@ export function evaluateFermentationStatus(
     overall = "warn";
     summary = "Fermentación en curso con advertencias";
     detail  = "El proceso continúa, pero existen condiciones fuera del rango óptimo.";
+  } else if (!envOnline && !mpuOnline) {
+    overall = "warn";
+    summary = "Sin conexión con los sensores";
+    detail  = "Ningún dispositivo está enviando datos. Verificar conectividad.";
   } else {
     overall = "ok";
     summary = "Fermentación en condiciones óptimas";

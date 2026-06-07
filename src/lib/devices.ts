@@ -166,6 +166,8 @@ export function getMetricStatus(
   if (value === null || value === undefined || Number.isNaN(value)) {
     return "normal";
   }
+  // pH = 0 significa sensor sin conectar — no es una de las 5 alertas oficiales.
+  if (metric === "ph" && value === 0) return "normal";
   const meta = METRICS[metric];
   if (meta.alertBelow !== undefined && value < meta.alertBelow) return "alert";
   if (meta.warnBelow !== undefined && value < meta.warnBelow) return "warning";
