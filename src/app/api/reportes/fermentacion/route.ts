@@ -50,16 +50,29 @@ export async function POST(request: Request) {
     return Response.json(
       {
         error:
-          "Falta OPENROUTER_API_KEY en .env.local. Reinicia el servidor despues de agregarla.",
+          "Falta OPENROUTER_API_KEY en las variables de entorno. Agrégala y reinicia el servidor.",
       },
       { status: 500 },
     );
   }
 
   const body = await readJson(request);
-  const days = clamp(Number(body?.days ?? 7), 1, 30);
+
+  // Soporta "hours" (sub-día) y "days" (multi-día).
+  // Si viene "hours", se ignora "days".
   const until = new Date();
-  const since = new Date(until.getTime() - days * 24 * 60 * 60 * 1000);
+  let since: Date;
+  let rangeLabel: string;
+
+  if (body?.hours !== undefined && Number.isFinite(Number(body.hours))) {
+    const hours = clamp(Number(body.hours), 1, 24);
+    since = new Date(until.getTime() - hours * 60 * 60 * 1000);
+    rangeLabel = hours === 1 ? "última hora" : `últimas ${hours} horas`;
+  } else {
+    const days = clamp(Number(body?.days ?? 7), 1, 30);
+    since = new Date(until.getTime() - days * 24 * 60 * 60 * 1000);
+    rangeLabel = days === 1 ? "últimas 24 horas" : `últimos ${days} días`;
+  }
 
   const readings = await fetchReadings({
     since,
@@ -71,22 +84,21 @@ export async function POST(request: Request) {
   if (readings.length === 0) {
     return Response.json(
       {
-        error:
-          "No hay lecturas disponibles para analizar en el rango seleccionado.",
+        error: `No hay lecturas disponibles para analizar en el rango: ${rangeLabel}.`,
       },
       { status: 404 },
     );
   }
 
   const payload = buildFermentationPayload(readings, since, until);
-  const prompt = buildPrompt(payload);
+  const prompt = buildPrompt(payload, rangeLabel);
 
   const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey}`,
-      "HTTP-Referer": "http://localhost:3000",
+      "HTTP-Referer": "https://zarcillo.azurewebsites.net",
       "X-Title": "Zarcillo Dashboard",
     },
     body: JSON.stringify({
@@ -118,7 +130,7 @@ export async function POST(request: Request) {
 
   if (!analysis) {
     return Response.json(
-      { error: "OpenRouter respondio sin texto de analisis." },
+      { error: "OpenRouter respondió sin texto de análisis." },
       { status: 502 },
     );
   }
@@ -220,17 +232,20 @@ function summarizeMetric(readings: Reading[], key: ReadingMetric): MetricSummary
   };
 }
 
-function buildPrompt(payload: ReturnType<typeof buildFermentationPayload>) {
+function buildPrompt(
+  payload: ReturnType<typeof buildFermentationPayload>,
+  rangeLabel: string,
+) {
   return [
-    "Eres un enologo y analista de datos IoT para fermentacion de vino.",
-    "Analiza estos datos reales de sensores y responde en espanol.",
-    "No inventes mediciones que no esten en los datos. Si falta una variable, dilo.",
+    "Eres un enólogo y analista de datos IoT para fermentación de vino.",
+    `Analiza estos datos reales de sensores del período: ${rangeLabel}. Responde en español.`,
+    "No inventes mediciones que no estén en los datos. Si falta una variable, dilo.",
     "Entrega un reporte breve con estas secciones exactas:",
     "1. Estado general",
     "2. Evidencias de los sensores",
     "3. Riesgos o desviaciones",
     "4. Acciones recomendadas",
-    "Usa rangos y promedios cuando ayuden. Enfocate en temperatura del vino, pH, humedad, luz, movimiento y estabilidad.",
+    "Usa rangos y promedios cuando ayuden. Enfócate en temperatura del vino, pH, humedad, luz, movimiento y estabilidad.",
     "",
     JSON.stringify(payload, null, 2),
   ].join("\n");
@@ -239,28 +254,28 @@ function buildPrompt(payload: ReturnType<typeof buildFermentationPayload>) {
 function formatOpenRouterError(status: number, openRouter: OpenRouterResponse) {
   const message =
     openRouter.error?.message ??
-    "OpenRouter no pudo generar el analisis de fermentacion.";
+    "OpenRouter no pudo generar el análisis de fermentación.";
 
   if (status === 401 || status === 403) {
     return [
-      `OpenRouter rechazo la solicitud (${status}): ${message}`,
-      "Revisa que OPENROUTER_API_KEY sea correcta y que el modelo gratuito este disponible para tu cuenta.",
+      `OpenRouter rechazó la solicitud (${status}): ${message}`,
+      "Revisa que OPENROUTER_API_KEY sea correcta y que el modelo gratuito esté disponible para tu cuenta.",
     ].join(" ");
   }
 
   if (status === 402 || status === 429) {
     return [
-      `OpenRouter respondio con error ${status}: ${message}`,
-      "Los modelos gratuitos tienen limites y pueden saturarse. Prueba mas tarde o cambia a otro modelo con sufijo :free.",
+      `OpenRouter respondió con error ${status}: ${message}`,
+      "Los modelos gratuitos tienen límites y pueden saturarse. Prueba más tarde o cambia a otro modelo con sufijo :free.",
     ].join(" ");
   }
 
   if (status === 404) {
     return [
-      `OpenRouter respondio con error 404: ${message}`,
-      "El modelo gratuito solicitado no esta disponible en este momento. La app usa openrouter/free para elegir automaticamente otro modelo gratis cuando sea posible.",
+      `OpenRouter respondió con error 404: ${message}`,
+      "El modelo gratuito solicitado no está disponible en este momento. La app usa openrouter/free para elegir automáticamente otro modelo gratis cuando sea posible.",
     ].join(" ");
   }
 
-  return `OpenRouter respondio con error ${status}: ${message}`;
+  return `OpenRouter respondió con error ${status}: ${message}`;
 }

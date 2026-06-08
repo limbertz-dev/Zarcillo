@@ -1,0 +1,59 @@
+name: Azure App Service CI/CD — Zarcillo
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    name: Build y Deploy a Azure App Service
+
+    steps:
+      # ── 1. Checkout ────────────────────────────────────────────────────────
+      - uses: actions/checkout@v4
+
+      # ── 2. Node.js ────────────────────────────────────────────────────────
+      - name: Configurar Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      # ── 3. Instalar dependencias ───────────────────────────────────────────
+      - name: Instalar dependencias
+        run: npm ci
+
+      # ── 4. Build Next.js (modo standalone = servidor Node) ─────────────────
+      # Las variables NEXT_PUBLIC_* se inyectan en el JS del cliente durante
+      # el build. OPENROUTER_API_KEY es solo servidor (runtime), no se necesita
+      # aquí, pero se puede agregar si se quiere validar en build-time.
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_LAMP_COMMAND_ENDPOINT: ${{ secrets.NEXT_PUBLIC_LAMP_COMMAND_ENDPOINT }}
+
+      # ── 5. Empaquetar el build standalone para el deploy ───────────────────
+      # next build --standalone genera .next/standalone con todo lo necesario.
+      # Copiamos los assets estáticos al lugar correcto y comprimimos.
+      - name: Empaquetar artefacto standalone
+        run: |
+          cp -r public .next/standalone/public
+          cp -r .next/static .next/standalone/.next/static
+          cd .next/standalone
+          zip -r ../../deploy.zip . --quiet
+          cd ../..
+          echo "Tamaño del artefacto:"
+          du -sh deploy.zip
+
+      # ── 6. Deploy a Azure App Service ─────────────────────────────────────
+      - name: Deploy a Azure App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ secrets.AZURE_APP_SERVICE_NAME }}
+          publish-profile: ${{ secrets.AZURE_APP_SERVICE_PUBLISH_PROFILE }}
+          package: deploy.zip
