@@ -399,7 +399,18 @@ export function evaluateFermentationProgress(
   const latest = envPts.length > 0 ? envPts[envPts.length - 1] : null;
   const wineTemp = latest?.wine ?? null;
   const ambientTemp = latest?.amb ?? null;
-  const ph = isValidWinePh(latest?.ph ?? null) ? latest?.ph ?? null : null;
+  // pH para mostrar: el último valor REAL del sensor (igual que el dashboard),
+  // sin filtrar por el rango oficial 2.9–4.0. Sólo 0/null cuentan como
+  // "desconectado", así que recorremos hacia atrás saltando esos parpadeos.
+  // (El filtro isValidWinePh se sigue usando aparte en envActivityOf para el
+  //  cálculo de actividad de fermentación.)
+  let ph: number | null = null;
+  for (let i = envPts.length - 1; i >= 0; i--) {
+    if (!phIsMissing(envPts[i].ph)) {
+      ph = envPts[i].ph;
+      break;
+    }
+  }
   const delta =
     wineTemp !== null && ambientTemp !== null ? wineTemp - ambientTemp : null;
 
@@ -489,7 +500,7 @@ export function evaluateFermentationProgress(
     delta !== null
       ? `${delta >= 0 ? "+" : ""}${delta.toFixed(1)} °C vs ambiente`
       : "sin ambiente";
-  const phText = ph !== null ? `pH válido ${ph.toFixed(2)}` : "pH no usado";
+  const phText = ph !== null ? `pH ${ph.toFixed(2)}` : "pH sin lectura";
   const basis =
     `Vino ${wineTemp?.toFixed(1)} °C (${deltaText}), ${phText}. ` +
     `Actividad zona ${(envActivity * 100).toFixed(0)} %, MPU ${(mpuActivity * 100).toFixed(0)} %, ` +
